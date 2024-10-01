@@ -1,0 +1,9 @@
+aiohappyeyeballs
+aiohttp
+aiosignal
+attrs
+frozenlist
+idna
+multidict
+pip
+yarl
