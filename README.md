@@ -24,7 +24,7 @@ This project is a custom monitoring toolkit designed to monitor various aspects 
 
     ```zsh
     git clone https://github.com/AgamMS10/AGreatFuzzer.git
-    cd monitoring-toolkit
+    cd AGreatFuzzer
     ```
 
 2. Ensure you have Python 3.6+ installed.
@@ -40,7 +40,7 @@ This project is a custom monitoring toolkit designed to monitor various aspects 
 To run the monitoring toolkit, use the following command:
 
 ```zsh
-python NetworkMonitor.py <pid> [options]
+python Toolkit.py <pid> [options]
 ```
 
 #### Options
@@ -54,7 +54,7 @@ python NetworkMonitor.py <pid> [options]
 #### Example
 
 ```zsh
-python NetworkMonitor.py 1234 -i 1 --network-traffic --connections --active-ports
+python Toolkit.py 1234 -i 1 --network-traffic --connections --active-ports
 ```
 
 ### Modules
