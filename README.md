@@ -1,4 +1,4 @@
-# COMP8005 Assignment 2
+# AgreatFuzzer
 
 ## Custom Monitoring Toolkit
 
@@ -23,7 +23,7 @@ This project is a custom monitoring toolkit designed to monitor various aspects 
 1. Clone the repository:
 
     ```zsh
-    git clone https://github.com/AgamMS10/COMP8005_A2.git
+    git clone https://github.com/AgamMS10/AgreatFuzzer.git
     cd monitoring-toolkit
     ```
 
