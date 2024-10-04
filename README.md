@@ -1,4 +1,4 @@
-# AgreatFuzzer
+# AGreatFuzzer
 
 ## Custom Monitoring Toolkit
 
@@ -23,7 +23,7 @@ This project is a custom monitoring toolkit designed to monitor various aspects 
 1. Clone the repository:
 
     ```zsh
-    git clone https://github.com/AgamMS10/AgreatFuzzer.git
+    git clone https://github.com/AgamMS10/AGreatFuzzer.git
     cd monitoring-toolkit
     ```
 
