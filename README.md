@@ -8,7 +8,7 @@ This project is a custom monitoring toolkit designed to monitor various aspects 
 
 - [Installation](#installation)
 - [Usage](#usage)
-    -[Options](#options)
+  - [Options](#options)
 - [Modules](#modules)
   - [ProcessStats](#processstats)
   - [NetworkTrafficMonitor](#networktrafficmonitor)
@@ -22,39 +22,27 @@ This project is a custom monitoring toolkit designed to monitor various aspects 
 
 1. Clone the repository:
 
-    ```zsh
-    git clone https://github.com/AgamMS10/AGreatFuzzer.git
-    cd AGreatFuzzer
-    ```
+   ```zsh
+   git clone https://github.com/AgamMS10/AGreatFuzzer.git
+   cd AGreatFuzzer
+   ```
 
 2. Ensure you have Python 3.6+ installed.
 
 3. Install the required dependencies:
 
-    ```zsh
-    pip install -r requirements.txt
-    ```
+   ```zsh
+   pip install -r requirements.txt
+   ```
 
 ### Usage
 
-To run the monitoring toolkit, use the following command:
-
-```zsh
-python Toolkit.py <pid> [options]
-```
-
 #### Options
-
-- `pid` : The PID of the process to monitor.
-- `-i, --interval`: Update interval in seconds (default: 5).
-- `--network-traffic`: Monitor network traffic (bytes sent/received).
-- `--connections`: Monitor active network connections.
-- `--active-ports`: Monitor active ports used by the process.
 
 #### Example
 
 ```zsh
-python Toolkit.py 1234 -i 1 --network-traffic --connections --active-ports
+python app.py
 ```
 
 ### Modules
