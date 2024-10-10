@@ -12,6 +12,7 @@ class Fuzzer:
     def mutation_based_fuzzing(self, dst_ip, dst_port, protocol, iterations):
         print("Starting Mutation-based Fuzzing...")
         for _ in range(iterations):
+            print("Iteration: ", _)
             payload = self.random_payload()
             packet = self.packet_gen.create_packet(dst_ip, dst_port, protocol, payload)
             self.packet_gen.send_packet(packet)
@@ -20,6 +21,7 @@ class Fuzzer:
     def generation_based_fuzzing(self, dst_ip, dst_port, protocol, iterations):
         print("Starting Generation-based Fuzzing...")
         for _ in range(iterations):
+            print("Iteration: ", _)
             payload = self.random_payload()
             packet = self.packet_gen.create_packet(dst_ip, dst_port, protocol, payload)
             self.packet_gen.send_packet(packet)
@@ -31,6 +33,7 @@ class Fuzzer:
         print("Starting Dictionary-based Fuzzing...")
         wordlist = self.load_wordlist(wordlist_file)
         for _ in range(iterations):
+            print("Iteration: ", _)
             payload = random.choice(wordlist).encode()
             packet = self.packet_gen.create_packet(dst_ip, dst_port, protocol, payload)
             self.packet_gen.send_packet(packet)
