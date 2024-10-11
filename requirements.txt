@@ -7,3 +7,4 @@ idna
 multidict
 pip
 yarl
+scapy

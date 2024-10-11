@@ -14,6 +14,7 @@ This project is a custom monitoring toolkit designed to monitor various aspects 
   - [NetworkTrafficMonitor](#networktrafficmonitor)
   - [ConnectionsMonitor](#connectionsmonitor)
   - [ActivePortsMonitor](#activeportsmonitor)
+  - [Fuzzer](#fuzzer)
 - [Utilities](#utilities)
 - [Contributing](#contributing)
 - [License](#license)
@@ -74,6 +75,13 @@ The `ActivePortsMonitor` class monitors the active ports used by a process.
 
 - **File**: `modules/active_ports.py`
 - **Class**: `ActivePortsMonitor`
+
+#### Fuzzer
+
+The `Fuzzer` class provides methods for different fuzzing techniques.
+
+- **File**: `modules/fuzzer.py`
+- **Class**: `Fuzzer`
 
 ### Utilities
 
