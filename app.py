@@ -1,6 +1,7 @@
 # app.py
 
 import sys
+from time import sleep
 
 from modules.active_ports import ActivePortsMonitor
 from modules.connections import ConnectionsMonitor
@@ -85,6 +86,7 @@ def monitor_network_traffic():
         interval = int(input("Enter the update interval in seconds: "))
         network_monitor = NetworkTrafficMonitor(pid)
         while True:
+            sleep(interval)
             clear_screen()
             network_monitor.display_network_traffic(interval)
     except KeyboardInterrupt:
