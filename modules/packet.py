@@ -3,7 +3,7 @@
 from scapy.all import ICMP, IP, TCP, UDP, Raw, send
 
 
-class PacketGenerator:
+class PacketHandler:
     def create_packet(self, dst_ip, dst_port=None, protocol="TCP", payload=b""):
         if protocol == "TCP":
             packet = IP(dst=dst_ip) / TCP(dport=dst_port) / Raw(load=payload)

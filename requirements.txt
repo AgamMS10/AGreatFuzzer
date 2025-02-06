@@ -8,3 +8,5 @@ multidict
 pip
 yarl
 scapy
+netifaces
+psutils

@@ -1,78 +1,173 @@
-# modules/network_traffic.py
+# modules/network_monitor.py
 
 import os
+import socket
+import time
+
+import psutil
+
+from modules.utils import clear_screen
 
 from . import utils
 
 
 class NetworkTrafficMonitor:
-    def __init__(self, pid):
-        self.pid = pid
+    def __init__(self):
         self.prev_stats = None
 
-    def get_network_stats(self):
-        net_dev_path = f"/proc/{self.pid}/net/dev"
-        stats = {}
+    def prompt_for_parameters(self):
+        interface = input("Enter the interface name: ")
+        interval = int(input("Enter the interval in seconds: "))
+        return interface, interval
 
-        if not os.path.exists(net_dev_path):
-            print(f"Network statistics not available for PID {self.pid}.")
-            return stats
+    def check_interface(self, interface):
+        # Use psutil to verify that the interface exists.
+        if interface not in psutil.net_if_stats():
+            print(f"Interface '{interface}' does not exist.")
+            return False
+        return True
 
-        try:
-            with open(net_dev_path, "r") as f:
-                data = f.readlines()
-        except Exception as e:
-            print(f"Error reading {net_dev_path}: {e}")
-            return stats
+    def scan_interfaces(self):
+        # List available interfaces using psutil.
+        interfaces = list(psutil.net_io_counters(pernic=True).keys())
+        print("Available Interfaces:")
+        for i, iface in enumerate(interfaces, 1):
+            print(f"{i}. {iface}")
+        print()
 
-        # Parse the data
-        for line in data[2:]:
-            line = line.strip()
-            if not line:
-                continue
-            interface, stats_line = line.split(":", 1)
-            stats_values = stats_line.strip().split()
-            bytes_received = int(stats_values[0])
-            bytes_transmitted = int(stats_values[8])
-            stats[interface.strip()] = {
-                "bytes_received": bytes_received,
-                "bytes_transmitted": bytes_transmitted,
-            }
-        return stats
+    def get_network_stats(self, interface):
+        counters = psutil.net_io_counters(pernic=True)
+        if interface in counters:
+            return counters[interface]._asdict()
+        else:
+            print(f"Interface '{interface}' not found.")
+            return None
 
-    def display_network_traffic(self, interval):
-        curr_stats = self.get_network_stats()
-        if not curr_stats:
-            return
+    def get_active_connections(self, interface):
+        """
+        Returns a list of active network connections whose local IP address belongs
+        to the selected interface.
+        """
+        # Get all IP addresses assigned to the interface.
+        if_addrs = psutil.net_if_addrs().get(interface, [])
+        ip_addresses = [
+            addr.address
+            for addr in if_addrs
+            if addr.family in (socket.AF_INET, socket.AF_INET6)
+        ]
 
-        print("Network Traffic:")
+        # Get all inet connections and filter by those with a local IP in ip_addresses.
+        conns = psutil.net_connections(kind="inet")
+        active_conns = []
+        for conn in conns:
+            if conn.laddr:
+                local_ip = conn.laddr[0]  # laddr is typically a tuple (ip, port)
+                if local_ip in ip_addresses:
+                    active_conns.append(conn)
+        return active_conns
+
+    def display_network_traffic(self, interface, curr_stats, interval):
+        """
+        Displays a formatted layout showing RX and TX statistics along with packets,
+        errors, and dropped counts. It computes rates if previous statistics exist.
+        """
+        # Compute rates if previous data exists.
+        if self.prev_stats:
+            rx_rate = (
+                curr_stats["bytes_recv"] - self.prev_stats["bytes_recv"]
+            ) / interval
+            tx_rate = (
+                curr_stats["bytes_sent"] - self.prev_stats["bytes_sent"]
+            ) / interval
+        else:
+            rx_rate = tx_rate = 0
+
+        header_line = "=" * 70
+        print(header_line)
+        print(f"Network Interface: {interface}")
+        print(header_line)
+        # Header for RX / TX columns.
+        print(f"{'':<15}{'RX':^25}{'TX':^25}")
+        print("-" * 70)
+        # Bytes (with rates)
         print(
-            f"{'Interface':<10} {'Bytes Received':<15} {'Bytes Transmitted':<18} {'Rx Rate':<15} {'Tx Rate':<15}"
+            f"{'Bytes':<15}"
+            f"{utils.format_bytes(curr_stats['bytes_recv'])} ({utils.format_bytes(rx_rate)}/s)"
+            f"{'':>5}{utils.format_bytes(curr_stats['bytes_sent'])} ({utils.format_bytes(tx_rate)}/s)"
         )
-        print("-" * 80)
-        for interface, data in curr_stats.items():
-            bytes_received_formatted = utils.format_bytes(data["bytes_received"])
-            bytes_transmitted_formatted = utils.format_bytes(data["bytes_transmitted"])
+        # Packets
+        print(
+            f"{'Packets':<15}{str(curr_stats['packets_recv']):<25}{str(curr_stats['packets_sent']):<25}"
+        )
+        # Errors
+        print(
+            f"{'Errors':<15}{str(curr_stats['errin']):<25}{str(curr_stats['errout']):<25}"
+        )
+        # Dropped
+        print(
+            f"{'Dropped':<15}{str(curr_stats['dropin']):<25}{str(curr_stats['dropout']):<25}"
+        )
+        print(header_line)
 
-            rx_rate = "-"
-            tx_rate = "-"
-            if self.prev_stats and interface in self.prev_stats:
-                rx_diff = (
-                    data["bytes_received"]
-                    - self.prev_stats[interface]["bytes_received"]
+    def display_active_connections(self, interface):
+        """
+        Displays a table of active connections (ports) on the selected interface.
+        """
+        active_conns = self.get_active_connections(interface)
+        print("\nActive Connections on Interface:", interface)
+        print("-" * 90)
+        print(
+            f"{'Local Port':<12}{'Remote Address':<22}{'Remote Port':<12}{'Status':<12}{'PID':<8}{'Process Name':<15}"
+        )
+        print("-" * 90)
+        if not active_conns:
+            print("No active connections.")
+        else:
+            for conn in active_conns:
+                # laddr is a tuple: (ip, port)
+                local_port = conn.laddr[1] if len(conn.laddr) > 1 else "-"
+                # raddr may be empty if not connected.
+                if conn.raddr:
+                    remote_ip = conn.raddr[0]
+                    remote_port = conn.raddr[1] if len(conn.raddr) > 1 else "-"
+                else:
+                    remote_ip = "-"
+                    remote_port = "-"
+                status = conn.status
+                pid = conn.pid if conn.pid is not None else "-"
+                proc_name = "-"
+                if conn.pid:
+                    try:
+                        proc = psutil.Process(conn.pid)
+                        proc_name = proc.name()
+                    except Exception:
+                        proc_name = "N/A"
+                print(
+                    f"{local_port:<12}{remote_ip:<22}{remote_port:<12}{status:<12}{pid:<8}{proc_name:<15}"
                 )
-                tx_diff = (
-                    data["bytes_transmitted"]
-                    - self.prev_stats[interface]["bytes_transmitted"]
-                )
-                rx_rate_value = rx_diff / interval
-                tx_rate_value = tx_diff / interval
-                rx_rate = utils.format_bytes(rx_rate_value) + "/s"
-                tx_rate = utils.format_bytes(tx_rate_value) + "/s"
+        print("-" * 90)
 
-            print(
-                f"{interface:<10} {bytes_received_formatted:<15} {bytes_transmitted_formatted:<18} {rx_rate:<15} {tx_rate:<15}"
-            )
+    def run(self):
+        try:
 
-        print("\n")
-        self.prev_stats = curr_stats
+            self.scan_interfaces()
+            interface, interval = self.prompt_for_parameters()
+
+            if not self.check_interface(interface):
+                return
+
+            while True:
+                curr_stats = self.get_network_stats(interface)
+                if curr_stats is None:
+                    break
+
+                # Clear the screen so the display updates in place.
+                clear_screen()
+                self.display_network_traffic(interface, curr_stats, interval)
+                self.display_active_connections(interface)
+                self.prev_stats = curr_stats
+
+                time.sleep(interval)
+        except KeyboardInterrupt:
+            print("\nExiting....")
+            exit()
