@@ -2,7 +2,10 @@
 
 import logging
 import random
+from time import sleep
 from typing import Callable, List, Optional
+
+import nmap  # New: Import nmap for network scanning
 
 from modules.packet import PacketHandler
 from modules.payload_generator import (
@@ -33,10 +36,80 @@ class Fuzzer:
             "dictionary": DictionaryPayloadGenerator,
         }
 
-    def prompt_for_parameters(self):
-
+    def get_target_ip(self) -> str:
+        """
+        Prompt the user for the target selection method.
+        Either a manual IP address input or an NMAP network scan.
+        """
         try:
-            dst_ip = utils.get_ip_address()
+            selection = (
+                input(
+                    "Select target selection method ('manual' for manual input or 'nmap' to scan network): "
+                )
+                .strip()
+                .lower()
+            )
+            if selection == "manual":
+                # Use existing helper to get an IP address
+                return utils.get_ip_address()
+            elif selection == "nmap":
+                # Ask the user for the network range to scan
+                network_range = input(
+                    "Enter network range to scan (e.g., 192.168.1.0/24): "
+                ).strip()
+                available_ips = self.scan_network(network_range)
+                if not available_ips:
+                    print("No available IP addresses found. Please try again.")
+                    return self.get_target_ip()
+                # Display the discovered IP addresses
+                print("\nAvailable IP addresses:")
+                for idx, ip in enumerate(available_ips, start=1):
+                    print(f"{idx}. {ip}")
+                # Let the user choose one by number
+                choice = input("Select an IP by entering its number: ").strip()
+                try:
+                    index = int(choice) - 1
+                    if index < 0 or index >= len(available_ips):
+                        print("Invalid selection. Please try again.")
+                        return self.get_target_ip()
+                    return available_ips[index]
+                except ValueError:
+                    print("Invalid input. Please enter a valid number.")
+                    return self.get_target_ip()
+            else:
+                print("Invalid selection. Please type 'manual' or 'nmap'.")
+                return self.get_target_ip()
+        except KeyboardInterrupt:
+            print("\nExiting....")
+            exit()
+
+    def scan_network(self, network_range: str) -> List[str]:
+        """
+        Uses nmap to perform a ping scan (-sn) on the provided network range and
+        returns a list of IP addresses that are up.
+        """
+        scanner = nmap.PortScanner()
+        try:
+            scanner.scan(hosts=network_range, arguments="-sn")
+        except Exception as e:
+            print(f"Error scanning network: {e}")
+            return []
+        available_ips = []
+        for host in scanner.all_hosts():
+            # Check if the host is up
+            if scanner[host].state() == "up":
+                available_ips.append(host)
+        return available_ips
+
+    def prompt_for_parameters(self):
+        """
+        Prompt for all parameters necessary for fuzzing.
+        The target IP is now determined by asking the user first whether to
+        manually input it or select one from an NMAP scan.
+        """
+        try:
+            # New: Prompt for target IP selection method (manual or nmap)
+            dst_ip = self.get_target_ip()
             dst_port = utils.get_port()
             protocol = utils.get_protocol()
             method = self.get_fuzzing_method()
@@ -57,17 +130,18 @@ class Fuzzer:
 
     def get_fuzzing_method(self):
         try:
-            method = input(
-                "Enter the fuzzing method (mutation, generation, dictionary): "
-            ).lower()
-            if method.lower() not in self.strategies:
+            method = (
+                input("Enter the fuzzing method (mutation, generation, dictionary): ")
+                .lower()
+                .strip()
+            )
+            if method not in self.strategies:
                 print(
                     "Invalid fuzzing method. Please try again. (mutation, generation, dictionary)"
                 )
                 return self.get_fuzzing_method()
-
             else:
-                return method.lower()
+                return method
         except ValueError as e:
             print(f"Invalid fuzzing method: {e}")
             return self.get_fuzzing_method()
@@ -76,10 +150,25 @@ class Fuzzer:
             exit()
 
     def run(self):
-        dst_ip, dst_port, protocol, method, iterations, kwargs = (
-            self.prompt_for_parameters()
-        )
-        self.fuzz(dst_ip, dst_port, protocol, method, iterations, **kwargs)
+        while True:
+            dst_ip, dst_port, protocol, method, iterations, kwargs = (
+                self.prompt_for_parameters()
+            )
+            self.fuzz(dst_ip, dst_port, protocol, method, iterations, **kwargs)
+
+            while True:
+                choice = (
+                    input("\nDo you want to run another fuzzing session? (Y/N): ")
+                    .strip()
+                    .lower()
+                )
+                if choice in ("y", "yes"):
+                    break
+                elif choice in ("n", "no"):
+                    print("Returning to the main application...\n")
+                    return
+                else:
+                    print("Invalid input. Please type 'Y' or 'N'.")
 
     def set_strategy(self, strategy_name: str, **kwargs):
         strategy_class = self.strategies.get(strategy_name.lower())
@@ -114,7 +203,7 @@ class Fuzzer:
             print(f"An error occurred: {e}")
             return
 
-        print(f"Starting {method.capitalize()}-Based Fuzzing...")
+        print(f"Starting {method.capitalize()}-Based Fuzzing on {dst_ip}...")
         for i in range(1, iterations + 1):
             try:
                 payload = self.payload_generator.generate_payload()
