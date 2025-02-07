@@ -3,11 +3,8 @@
 import sys
 from time import sleep
 
-from modules.active_ports import ActivePortsMonitor
-from modules.connections import ConnectionsMonitor
 from modules.fuzzer import Fuzzer
 from modules.network_monitor import NetworkTrafficMonitor
-from modules.process_stats import ProcessStats
 from modules.utils import clear_screen
 
 
