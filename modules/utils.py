@@ -3,10 +3,12 @@
 import ipaddress
 import os
 import re
+from typing import List
+
+import nmap
 
 
 def format_bytes(size):
-    # Converts bytes to a human-readable format
     for unit in ["B", "KB", "MB", "GB", "TB", "PB"]:
         if size < 1024:
             return f"{size:.2f} {unit}"
@@ -14,46 +16,11 @@ def format_bytes(size):
     return f"{size:.2f} EB"
 
 
-def parse_address(hex_address):
-    ip_hex, port_hex = hex_address.split(":")
-    ip = ".".join([str(int(ip_hex[i : i + 2], 16)) for i in range(6, -2, -2)])
-    port = int(port_hex, 16)
-    return ip, port
-
-
-def tcp_state(state_hex):
-    tcp_states = {
-        "01": "ESTABLISHED",
-        "02": "SYN_SENT",
-        "03": "SYN_RECV",
-        "04": "FIN_WAIT1",
-        "05": "FIN_WAIT2",
-        "06": "TIME_WAIT",
-        "07": "CLOSE",
-        "08": "CLOSE_WAIT",
-        "09": "LAST_ACK",
-        "0A": "LISTEN",
-        "0B": "CLOSING",
-        "0C": "NEW_SYN_RECV",
-        "0D": "UNKNOWN",
-    }
-    return tcp_states.get(state_hex.upper(), "UNKNOWN")
-
-
 def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
 
 
 def validate_ip_address(ip_address):
-    """
-    Validates an IP address.
-
-    Parameters:
-    ip_address (str): The IP address to validate.
-
-    Returns:
-    bool: True if the IP address is valid, False otherwise.
-    """
     try:
         ipaddress.ip_address(ip_address)
         return True
@@ -62,28 +29,10 @@ def validate_ip_address(ip_address):
 
 
 def validate_port(port):
-    """
-    Validates a port number.
-
-    Parameters:
-    port (int): The port number to validate.
-
-    Returns:
-    bool: True if the port number is valid, False otherwise.
-    """
     return 0 <= port <= 65535
 
 
 def validate_protocol(protocol):
-    """
-    Validates a protocol.
-
-    Parameters:
-    protocol (str): The protocol to validate.
-
-    Returns:
-    bool: True if the protocol is valid, False otherwise.
-    """
     return protocol.upper() in ["TCP", "UDP", "ICMP"]  # Can add more protocols here
 
 
@@ -132,6 +81,20 @@ def get_ip_address():
         exit()
 
 
+def get_network_range():
+    try:
+        network_range = input("Enter the network range (CIDR notation): ")
+        if not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$", network_range):
+            raise ValueError("Invalid network range. Must be in CIDR notation.")
+        return network_range
+    except ValueError as e:
+        print(e)
+        return get_network_range()
+    except KeyboardInterrupt:
+        print("\nExiting....")
+        exit()
+
+
 def get_port():
     try:
         port = int(input("Enter the target port: "))
@@ -171,3 +134,22 @@ def get_number(prompt):
     except KeyboardInterrupt:
         print("\nExiting....")
         exit()
+
+
+def scan_network(network_range: str) -> List[str]:
+    """
+    Uses nmap to perform a ping scan (-sn) on the provided network range and
+    returns a list of IP addresses that are up.
+    """
+    scanner = nmap.PortScanner()
+    try:
+        scanner.scan(hosts=network_range, arguments="-sn")
+    except Exception as e:
+        print(f"Error scanning network: {e}")
+        return []
+    available_ips = []
+    for host in scanner.all_hosts():
+        # Check if the host is up
+        if scanner[host].state() == "up":
+            available_ips.append(host)
+    return available_ips

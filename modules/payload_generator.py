@@ -1,6 +1,6 @@
 # modules/payload_generators.py
 
-import logging
+
 import random
 from typing import List, Optional
 
@@ -47,8 +47,7 @@ class DictionaryPayloadGenerator(PayloadGenerator):
 
     def generate_payload(self) -> bytes:
         if not self.wordlist:
-            # Fallback to random payload if wordlist is empty
-            return
+            return GenerationPayloadGenerator(self.default_length).generate_payload()
         word = random.choice(self.wordlist)
         return word.encode()
 
@@ -57,7 +56,6 @@ class DictionaryPayloadGenerator(PayloadGenerator):
         try:
             with open(file_path, "r") as f:
                 words = [line.strip() for line in f if line.strip()]
-                print(words)
             return words
         except Exception as e:
             print(f"Error loading wordlist from '{file_path}': {e}")
