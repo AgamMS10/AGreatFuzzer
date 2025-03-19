@@ -13,51 +13,13 @@ from modules import utils
 
 class Scanner:
     def __init__(self, target=None, verbose=True):
-        self.target = target if target else self.get_target_ip()
+        self.target = target if target else utils.get_target_ip(logger=self.log)
         self.verbose = verbose
         self.scan_results = {}
 
     def log(self, message):
         if self.verbose:
             print(message)
-
-    def get_target_ip(self) -> str:
-        try:
-            selection = (
-                input(
-                    "Select target selection method ('manual' for manual input or 'nmap' to scan network): "
-                )
-                .strip()
-                .lower()
-            )
-            if selection == "manual":
-                return utils.get_ip_address()
-            elif selection == "nmap":
-                network_range = utils.get_network_range()
-                self.log(f"Scanning network range: {network_range}")
-                available_ips = utils.scan_network(network_range)
-                if not available_ips:
-                    self.log("No available IP addresses found. Please try again.")
-                    return self.get_target_ip()
-                self.log("\nAvailable IP addresses:")
-                for idx, ip in enumerate(available_ips, start=1):
-                    self.log(f"{idx}. {ip}")
-                choice = input("Select an IP by entering its number: ").strip()
-                try:
-                    index = int(choice) - 1
-                    if index < 0 or index >= len(available_ips):
-                        self.log("Invalid selection. Please try again.")
-                        return self.get_target_ip()
-                    return available_ips[index]
-                except ValueError:
-                    self.log("Invalid input. Please enter a valid number.")
-                    return self.get_target_ip()
-            else:
-                self.log("Invalid selection. Please type 'manual' or 'nmap'.")
-                return self.get_target_ip()
-        except KeyboardInterrupt:
-            self.log("\nExiting....")
-            exit()
 
     def scan_ports(self):
         nm = nmap.PortScanner()

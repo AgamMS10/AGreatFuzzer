@@ -9,8 +9,8 @@ from modules import packet, payload_generator, utils
 
 
 class Fuzzer:
-    def __init__(self, target, wordlist_file=None, verbose=True):
-        self.target = target
+    def __init__(self, target=None, wordlist_file=None, verbose=True):
+        self.target = target if target else utils.get_target_ip()
         self.verbose = verbose
         self.fuzz_results = {}
         self.wordlist_file = wordlist_file
