@@ -115,7 +115,7 @@ class Scanner:
         return open_ports
 
     def nmap_scan(self):
-        self.log("Performing comprehensive nmap scan on target: " + self.target)
+        self.log("Performing nmap services scan on target: " + self.target)
         nm = nmap.PortScanner()
         scan_arguments = "-A"
         try:
