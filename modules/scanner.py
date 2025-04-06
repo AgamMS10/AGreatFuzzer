@@ -4,6 +4,7 @@ import os
 import platform
 import socket
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import sleep
 
 import nmap
@@ -13,114 +14,130 @@ from modules import utils
 
 class Scanner:
     def __init__(self, target=None, verbose=True):
-        self.target = target if target else utils.get_target_ip(logger=self.log)
         self.verbose = verbose
+        self.target = target if target else utils.get_target_ip(logger=self.log)
         self.scan_results = {}
 
     def log(self, message):
         if self.verbose:
             print(message)
 
-    def scan_ports(self):
-        nm = nmap.PortScanner()
-        nm.scan(self.target, "0-1023", arguments="-sS -sU")
+    def scan_udp_port(self, port):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(2)
+        try:
+            s.sendto(b"", (self.target, port))
+            try:
+                data, _ = s.recvfrom(1024)
+                return port, "open"
+            except socket.timeout:
+                return port, "Timeout"
+        except Exception:
+            return port, None
+        finally:
+            s.close()
 
-        results = {}
-        if self.target in nm.all_hosts():
-            results[self.target] = {
-                "hostname": nm[self.target].hostname(),
-                "state": nm[self.target].state(),
-                "protocols": {},
+    def scan_tcp_port(self, port):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(1)
+        try:
+            result = s.connect_ex((self.target, port))
+            if result == 0:
+                return port, "open"
+            else:
+                return port, None
+        except Exception:
+            return port, None
+        finally:
+            s.close()
+
+    def scan_ports(self):
+        """
+        Open port scan for TCP and UDP ports 0-1023.
+        Returns a dictionary with TCP and UDP scan results.
+        """
+        self.log("Starting open port scan on TCP and UDP ports 0-1023...")
+        results = {"tcp": {}, "udp": {}}
+
+        with ThreadPoolExecutor(max_workers=100) as executor:
+            tcp_futures = {
+                executor.submit(self.scan_tcp_port, port): port
+                for port in range(0, 1024)
             }
-            for proto in nm[self.target].all_protocols():
-                results[self.target]["protocols"][proto] = {}
-                for port in sorted(nm[self.target][proto].keys()):
-                    results[self.target]["protocols"][proto][port] = nm[self.target][
-                        proto
-                    ][port]
-                    print(
-                        f"Target: {self.target}, Protocol: {proto}, Port: {port}, Info: {nm[self.target][proto][port]}"
-                    )
-        else:
-            print(f"Target {self.target} not found in scan results.")
+            udp_futures = {
+                executor.submit(self.scan_udp_port, port): port
+                for port in range(0, 1024)
+            }
+
+            for future in as_completed(tcp_futures):
+                port, status = future.result()
+                if status:
+                    results["tcp"][port] = status
+
+            for future in as_completed(udp_futures):
+                port, status = future.result()
+                if status:
+                    results["udp"][port] = status
+
+        self.scan_results["open_port_scan"] = results
+        self.log("Open port scan completed.")
         return results
 
     def custom_port_range_scan(self):
+        """
+        Scans a user provided custom port range for open TCP and UDP ports.
+        Returns a dictionary with TCP and UDP scan results for the specified range.
+        """
+        port_range = input("Enter custom port range (e.g., 20-80): ").strip()
         try:
-            start_port = int(input("Enter start port: ").strip())
-            end_port = int(input("Enter end port: ").strip())
-        except ValueError:
-            self.log("Invalid port numbers entered. Please try again.")
-            return self.custom_port_range_scan()
+            start_port, end_port = map(int, port_range.split("-"))
+        except Exception:
+            self.log("Invalid port range format. Use 'start-end' (e.g., 20-80).")
+            return None
+
         self.log(
-            f"Scanning ports from {start_port} to {end_port} on target: {self.target}"
+            f"Starting custom port range scan for ports {start_port} to {end_port}..."
         )
-        open_ports = {}
-        for port in range(start_port, end_port + 1):
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(1)
-                result = s.connect_ex((self.target, port))
-                if result == 0:
-                    try:
-                        s.send(b"\r\n")
-                        banner = s.recv(1024)
-                        banner = banner.decode(errors="ignore")
-                    except Exception:
-                        banner = ""
-                    open_ports[port] = banner
-                    self.log(f"Port {port} open, banner: {banner}")
-                s.close()
-            except Exception as e:
-                self.log(f"Error scanning port {port}: {e}")
-        self.scan_results["custom_ports"] = open_ports
-        return open_ports
-
-    def nmap_scan(self):
-        self.log("Performing nmap services scan on target: " + self.target)
-        nm = nmap.PortScanner()
-        scan_arguments = "-A"
-        try:
-            nm.scan(self.target, arguments=scan_arguments)
-        except Exception as e:
-            self.log(f"Error during nmap scan: {e}")
-            self.scan_results["nmap_scan"] = {"error": str(e)}
-            return self.scan_results["nmap_scan"]
-
-        if self.target not in nm.all_hosts():
-            self.log("Target not found in nmap scan results")
-            self.scan_results["nmap_scan"] = {
-                "error": "Target not found in nmap scan results"
+        results = {"tcp": {}, "udp": {}}
+        with ThreadPoolExecutor(max_workers=100) as executor:
+            tcp_futures = {
+                executor.submit(self.scan_tcp_port, port): port
+                for port in range(start_port, end_port + 1)
             }
-            return self.scan_results["nmap_scan"]
+            udp_futures = {
+                executor.submit(self.scan_udp_port, port): port
+                for port in range(start_port, end_port + 1)
+            }
 
-        target_info = nm[self.target]
-        nmap_results = {"detailed_info": target_info, "raw": target_info}
-        self.scan_results["nmap_scan"] = nmap_results
-        self.log("Nmap scan results: " + str(nmap_results))
-        return nmap_results
+            for future in as_completed(tcp_futures):
+                port, status = future.result()
+                if status:
+                    results["tcp"][port] = status
 
-    def traceroute(self):
-        self.log(
-            f"Initiating traceroute on target: {self.target}. Please wait while the route is being mapped."
-        )
-        system_name = platform.system().lower()
-        if "windows" in system_name:
-            cmd = ["tracert", self.target]
-        else:
-            cmd = ["traceroute", self.target]
-        self.log(f"Using command: {' '.join(cmd)}")
+            for future in as_completed(udp_futures):
+                port, status = future.result()
+                if status:
+                    results["udp"][port] = status
+
+        self.scan_results["custom_port_scan"] = results
+        self.log("Custom port range scan completed.")
+        return results
+
+    def service_scan(self):
+        """
+        Performs a detailed scan for services and versions on the target machine using nmap.
+        Returns the nmap scan result as a dictionary.
+        """
+        self.log("Starting service scan using nmap (-sV)...")
+        nm = nmap.PortScanner()
         try:
-            output = subprocess.check_output(cmd, universal_newlines=True)
-            self.log(
-                "Traceroute completed successfully. Here is the detailed output:\n"
-                + output
-            )
-            self.scan_results["traceroute"] = output
-            return output
+            nm.scan(self.target, arguments="-sV")
+            results = nm[self.target]
+            self.scan_results["service_scan"] = results
+            self.log("Service scan completed.")
+            return results
         except Exception as e:
-            self.log(f"Error during traceroute execution: {e}")
-            self.scan_results["traceroute"] = {"error": str(e)}
+            self.log(f"Error during service scan: {e}")
             return None
 
     def log_results_to_file(self, filename="scan_results.log"):
@@ -137,11 +154,10 @@ class Scanner:
         menu = """
 Select an option:
 1. Open port scan (TCP and UDP ports 0-1023)
-2. Nmap info scan (comprehensive target information)
-3. Traceroute to target
-4. Custom port range scan
-5. Log results to file
-6. Exit
+2. Sevices scan (nmap)
+3. Custom port range scan
+4. Log results to file
+5. Exit
 """
         while True:
             print(menu)
@@ -149,14 +165,12 @@ Select an option:
             if choice == "1":
                 self.scan_ports()
             elif choice == "2":
-                self.nmap_scan()
+                self.service_scan()
             elif choice == "3":
-                self.traceroute()
-            elif choice == "4":
                 self.custom_port_range_scan()
-            elif choice == "5":
+            elif choice == "4":
                 self.log_results_to_file()
-            elif choice == "6":
+            elif choice == "5":
                 self.log("Exiting...")
                 break
             else:

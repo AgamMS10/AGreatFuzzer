@@ -167,8 +167,8 @@ def get_target_ip(logger=print) -> str:
 
         if selection == "manual":
             ip = get_ip_address()
-            network_range = get_network_range()
-            available_ips = scan_network(network_range)
+            network = ipaddress.ip_network(f"{ip}/24", strict=False)
+            available_ips = scan_network(str(network))
             if ip not in available_ips:
                 print(
                     "The IP address you entered is not active in the network. Please try again."

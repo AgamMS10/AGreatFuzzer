@@ -20,7 +20,6 @@ def main():
         print("4) Exit")
         choice = input("Enter your choice: ")
         if choice == "1":
-            # monitoring_menu()
             monitor_menu()
         elif choice == "2":
             fuzzing_menu()
